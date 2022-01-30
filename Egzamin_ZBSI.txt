@@ -1,0 +1,138 @@
+1.Uzyskaj dostęp do internetu z maszyny S1
+Maszyna R1:
+Sudo su
+ip r add default via 192.168.100.1 dev eth0
+ip r
+Default via 192.168.100.1 dev eth0 proto dhcp
+192.168.100.0/24 dev eth0 proto kernel scope link src IP
+192.168.111.0/24 dev eth1 proto kernel scope link src IP
+
+zypper in -y firewalld
+systemctl enable firewalld
+systemctl start firewalld
+systemctl status firewalld
+
+firewalld-cmd --set-default-zone=external
+success
+firewall-cmd --get-default-zone
+external
+
+firewall-cmd --add-interface=eth0
+success
+firewall-cmd --list-all
+external (active)
+target: default
+icmp-block-inversion: no
+interfaces: eth0
+sources:
+services: ssh
+ports:
+porticols:
+masquerade: yes
+forward-ports:
+source-ports:
+icmp-blocks:
+rich rules:
+
+firewall-cmd --add-interface=eth1 --zone-dmz
+success
+firewall-cmd --list-all --zone=dmz
+dmz (active)
+target: default
+icmp-block-inversion: no
+interfaces: eth1
+sources:
+services:
+services: ssh
+ports:
+protocols:
+masquerade: no
+forward-ports:
+source-ports:
+icmp-blocks:
+rich rules:
+
+firewall-cmd --add-masquerade --zone=dmz
+success
+firewall-cmd --list-all --zone=dmz
+dmz (active)
+target: default
+icmp-block-inversion: no
+interfaces: eth1
+sources:
+services: ssh
+ports:
+protocols:
+masquerade: yes
+forward-ports:
+source-ports:
+icmp-blocks:
+rich rules:
+
+Maszyna S1:
+ip r add default via 192.168.111.76
+ip r
+default via 192.168.111.76 dev eth0
+192.168.111.0/24 dev eth0 proto kernel scope link src (IP)
+
+2.Na hoście S1 uruchom usługę WWW apache2 z przykładową stroną ukazującą napis "strona internetowa maszyny S1"
+
+zypper in -y apache2 apache2-example-pages
+
+systemctl  start apache2
+w3m  http://(IP).
+
+
+3. Zrób na maszynie R1 takie przekierowanie aby z zewnątrz wywołując stronę z maszyny R1 otwierało stronę S1.
+
+Maszyna R1:
+
+firewall-cmd --add-service=http --permanent
+success
+firewall-cmd -add-forward-port=port80:proto=tcp:toport80:toaddr=(IP) --permanent
+success
+
+firewall-cmd --reload
+success
+firewall-cmd --list-all
+external (active)
+target: default
+icmp-block-inversion:no
+interfaces: eth0
+sources:
+services: ssh http
+ports:
+protocols:
+masquerade: yes
+forward-ports: port=80:proto=tcp:toport=80:toaddr=(IP)
+source-ports:
+icmp-blocks:
+rich rules:
+
+maszyna isi_x
+w3m http://IP
+
+4.Zarządzaj zawartością strony www na maszynie S1 poprzez protokół ssh łącząc sie na porcie 1111 maszyny R1.Wywołanie ssh na maszynie R1 na porcie 1111 przekazuje połączenie na maszynę S1 na port 22
+
+Maszyna R1:
+
+firewall-cmd -add-forward-port=port=1111:proto=tcp:toport=22:toaddr=(IP) --permanent
+
+firewall-cmd --list-all 
+external (active)
+target: default
+icmp-block-inversion: no
+interfaces: eth0
+sorces:
+services: ssh http 
+ports:
+protocols: 
+masquerade: yes
+forward-ports: port=80:proto=tcp:toport=80:toaddr=(IP)
+	port=1111:proto=tcp:toport=22:toaddr=(IP)
+source-ports:
+icmp-blocks:
+rich rules:
+
+Maszyna isi_x:
+ssh root@(IP) -p 1111
